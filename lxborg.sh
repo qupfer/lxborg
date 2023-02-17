@@ -1,5 +1,7 @@
 #!/bin/bash
 
+### use external config ###
+configfile=config.txt
 
 ### Backup Config ###
 machinename=myContainer
@@ -21,6 +23,11 @@ borg_remote_path='~/borg_portable'
 ### LXC CONFIG ###
 container_snapshot_path="/var/snap/lxd/common/lxd/snapshots"
 
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+
 ### commandline options from https://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash
 # More safety, by turning some bugs into errors.
 # Without `errexit` you don’t need ! and can replace
@@ -35,7 +42,7 @@ if [[ ${PIPESTATUS[0]} -ne 4 ]]; then
     exit 1
 fi
 
-LONGOPTS=machinename:,snapshotname:,archivename:
+LONGOPTS=machinename:,snapshotname:,archivename:,configfile:
 OPTIONS=m:s:a:
 # -regarding ! and PIPESTATUS see above
 # -temporarily store output to be able to check for errors
@@ -50,8 +57,9 @@ fi
 # read getopt’s output this way to handle the quoting right:
 eval set -- "$PARSED"
 
-machinename=$machinename snapshotname=$snapshotname archivename=$archivename
+machinename=$machinename snapshotname=$snapshotname archivename=$archivename 
 
+[ -f $configfile ] && source $configfile
 while true; do
     case "$1" in
         -m|--machinename)
@@ -82,7 +90,7 @@ done
 
 ### Backup Config ###
 date=$(date +%F_%T)
- [ -z "$archivename" ] && archivename="${machinename}_$(date +%F_%T)"
+[ -z "$archivename" ] && archivename="${machinename}_$(date +%F_%T)"
 
 
 ### CODE ###
