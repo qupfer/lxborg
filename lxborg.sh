@@ -123,5 +123,5 @@ local_sha=$(sha256sum "$BORG_BIN" | cut -d" " -f1)
 
 
 sudo tar --numeric-owner --xattrs --acls -c -O  -C "$container_snapshot_path/$machinename/"  --transform "s/$snapshotname/backup\/container/" "$snapshotname" -C "$indexdir" --transform "s/^index.yaml/backup\/index.yaml/" index.yaml | \
-"$BORG_BIN" create  -s --list --compression zstd --stdin-name "${archive_name}.tar" "$archive_name" -
+"$BORG_BIN" create  -s --list --compression zstd --stdin-name "${archivename}.tar" "$archivename" -
 
