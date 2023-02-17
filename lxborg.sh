@@ -13,7 +13,7 @@ ssh_port=22
 ssh_key="" # not implemented yet
 
 ### BORG CONFIG ###
-borg_repo="ssh://${ssh_user}"@"${ssh_host}":"${ssh_port}/data/praxis_repo"
+borg_repo="ssh://${ssh_user}"@"${ssh_host}":"${ssh_port}/data/test_repo"
 borg_bin="./borg2b4"
 borg_passphrase="abcde"
 borg_remote_path='~/borg_portable'
