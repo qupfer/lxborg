@@ -93,12 +93,12 @@ export BORG_PASSPHRASE="$borg_passphrase"
 
 
 # make a snapsghot
-lxc snapshot "$container_name"  "$snapshotname" --reuse
+lxc snapshot "$machinename"  "$snapshotname" --reuse
 
 
 # prepare index.yaml
 container_prefix=$(cat <<-EOF
-name: $container_name
+name: $machinename
 backend: btrfs
 pool: default
 optimized: false
@@ -107,7 +107,7 @@ type: container
 config:
 EOF
 )
-container_info=$(sed 's/^/  /' "$container_snapshot_path/$container_name/$snapshotname/backup.yaml")
+container_info=$(sed 's/^/  /' "$container_snapshot_path/$machinename/$snapshotname/backup.yaml")
 printf "${container_prefix}\n${container_info}" >  /tmp/index.yaml
 
 
@@ -121,6 +121,6 @@ local_sha=$(sha256sum "$BORG_BIN" | cut -d" " -f1)
 "$BORG_BIN" rlist || "$BORG_BIN" rcreate --encryption=repokey-aes-ocb 
 
 
-sudo tar --numeric-owner --xattrs --acls -c -O  -C "$container_snapshot_path/$container_name/"  --transform "s/$snapshotname/backup\/container/" "$snapshotname" -C /tmp --transform "s/^index.yaml/backup\/index.yaml/" index.yaml | \
+sudo tar --numeric-owner --xattrs --acls -c -O  -C "$container_snapshot_path/$machinename/"  --transform "s/$snapshotname/backup\/container/" "$snapshotname" -C /tmp --transform "s/^index.yaml/backup\/index.yaml/" index.yaml | \
 "$BORG_BIN" create  -s --list --compression zstd --stdin-name "${archive_name}.tar" "$archive_name" -
 
