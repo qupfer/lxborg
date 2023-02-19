@@ -1,0 +1,23 @@
+#### COPY TO CONFIGFILE ####
+### Backup Config ###
+machinename=myContainer
+snapshotname=borg
+archivename=""   # if its empty, the archivename is name_date (myContainer_2023-02-17_07:37:25)
+additonal_tar_args="-v"
+
+### SSH Config ###
+ssh_user=root
+ssh_host=myhost.domain.com
+ssh_port=22
+ssh_key="" # not implemented yet
+
+### BORG CONFIG ###
+borg_repo="ssh://${ssh_user}"@"${ssh_host}":"${ssh_port}/data/test_repo"
+borg_bin="./borg2b4"
+borg_passphrase="abcde"
+borg_remote_path='~/borg_portable'
+
+### LXC CONFIG ###
+container_snapshot_path="/var/snap/lxd/common/lxd/snapshots"
+
+### END COPY TO CONFIGFILE ###
