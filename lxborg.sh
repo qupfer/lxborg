@@ -103,16 +103,8 @@ while true; do
 done
 
 
-if [ -n "$execute" ]; then
-set -x
-$BORG_BIN "$execute"
-exit 0
-fi
-
 date=$(date +%F_%T)
 [ -z "$archivename" ] && archivename="${machinename}_$(date +%F_%T)"
-
-
 
 
 # make a snapsghot
