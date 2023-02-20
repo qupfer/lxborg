@@ -102,7 +102,8 @@ while true; do
 done
 
 
-if [ -n "$execute" ]; then
+
+if [ -n "${execute-}" ]; then
 "$BORG_BIN" $execute
 exit 0
 fi
