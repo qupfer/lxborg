@@ -72,7 +72,6 @@ while true; do
     case "$1" in
         -r|--run)
             execute="$2"
-            $BORG_BIN $execute
             shift 2
             ;;
         -m|--machinename)
@@ -103,8 +102,15 @@ while true; do
 done
 
 
+if [ -n "$execute" ]; then
+"$BORG_BIN" $execute
+exit 0
+fi
+
 date=$(date +%F_%T)
 [ -z "$archivename" ] && archivename="${machinename}_$(date +%F_%T)"
+
+
 
 
 # make a snapsghot
