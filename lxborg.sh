@@ -20,7 +20,9 @@ borg_passphrase="abcde"
 borg_remote_path='~/borg_portable'
 
 ### LXC CONFIG ###
-container_snapshot_path="/var/snap/lxd/common/lxd/snapshots"
+lxd_path="/var/snap/lxd/common/lxd"
+container_snapshot_path="${lxd_path}/snapshots"
+vm_snapshot_path="${lxd_path}/virtual-machines-snapshots"
 
 ### END COPY TO CONFIGFILE ###
 
@@ -50,8 +52,8 @@ if [[ ${PIPESTATUS[0]} -ne 4 ]]; then
     exit 1
 fi
 
-LONGOPTS=machinename:,snapshotname:,archivename:,configfile:
-OPTIONS=m:s:a:c:
+LONGOPTS=run:,machinename:,snapshotname:,archivename:,configfile:
+OPTIONS=r:m:s:a:c:
 # -regarding ! and PIPESTATUS see above
 # -temporarily store output to be able to check for errors
 # -activate quoting/enhanced mode (e.g. by writing out “--options”)
@@ -68,6 +70,11 @@ eval set -- "$PARSED"
 
 while true; do
     case "$1" in
+        -r|--run)
+            execute="$2"
+            $BORG_BIN $execute
+            shift 2
+            ;;
         -m|--machinename)
             machinename="$2"
             shift 2
@@ -96,6 +103,12 @@ while true; do
 done
 
 
+if [ -n "$execute" ]; then
+set -x
+$BORG_BIN "$execute"
+exit 0
+fi
+
 date=$(date +%F_%T)
 [ -z "$archivename" ] && archivename="${machinename}_$(date +%F_%T)"
 
@@ -104,6 +117,10 @@ date=$(date +%F_%T)
 
 # make a snapsghot
 lxc snapshot "$machinename"  "$snapshotname" --reuse
+
+
+# container of vm?
+type=$(lxc info $machinename | grep -i '^Type:' | cut -d' ' -f2)
 
 
 # prepare index.yaml
@@ -117,9 +134,36 @@ type: container
 config:
 EOF
 )
-container_info=$(sudo sed 's/^/  /' "$container_snapshot_path/$machinename/$snapshotname/backup.yaml")
+
+vm_prefix=$(cat <<-EOF
+name: $machinename
+backend: btrfs
+pool: default
+optimized: false
+optimized_header: false
+type: virtual-machine
+config:
+EOF
+)
+
+
+
+#prepare info
 indexdir=$(mktemp -d)
-printf "${container_prefix}\n${container_info}" > "$indexdir"/index.yaml
+if [ "$type" == "container" ]; then
+    prefix="$container_prefix"
+    info=$(sudo sed 's/^/  /' "$container_snapshot_path/$machinename/$snapshotname/backup.yaml")
+    tar_command="sudo tar "$additonal_tar_args" --numeric-owner --xattrs --acls -c -O  -C "$container_snapshot_path/$machinename/"  --transform "s#$snapshotname#backup/container#" "$snapshotname" -C "$indexdir" --transform "s#^index.yaml#backup/index.yaml#"  index.yaml" 
+
+elif [ "$type" == "virtual-machine" ]; then
+    prefix="$vm_prefix"
+    info=$(sudo sed 's/^/  /' "$vm_snapshot_path/$machinename/$snapshotname/backup.yaml")
+    tar_command="sudo tar "$additonal_tar_args" --numeric-owner --xattrs --acls -c -O  -C "$vm_snapshot_path/$machinename/" --transform "s#$snapshotname#backup/virtual-machine#" --transform "s#backup/virtual-machine/root.img#backup/virtual-machine.img#"  "$snapshotname" -C "$indexdir" --transform "s#^index.yaml#backup/index.yaml#" index.yaml"
+fi
+
+printf "${prefix}\n${info}" > "$indexdir"/index.yaml
+
+
 
 
 # put borg to destination
@@ -132,6 +176,9 @@ local_sha=$(sha256sum "$BORG_BIN" | cut -d" " -f1)
 "$BORG_BIN" rlist || "$BORG_BIN" rcreate --encryption=repokey-aes-ocb 
 
 
-sudo tar "$additonal_tar_args" --numeric-owner --xattrs --acls -c -O  -C "$container_snapshot_path/$machinename/"  --transform "s/$snapshotname/backup\/container/" "$snapshotname" -C "$indexdir" --transform "s/^index.yaml/backup\/index.yaml/" index.yaml | \
-"$BORG_BIN" create  -s --list --compression zstd --stdin-name "${archivename}.tar" "$archivename" -
+#BORG IT
+"$BORG_BIN" create  -s --content-from-command --list --progress --compression zstd --stdin-name "${archivename}.tar" "$archivename" -- $tar_command
+
+#sudo tar "$additonal_tar_args" --numeric-owner --xattrs --acls -c -O  -C "$container_snapshot_path/$machinename/"  --transform "s/$snapshotname/backup\/container/" "$snapshotname" -C "$indexdir" --transform "s/^index.yaml/backup\/index.yaml/" index.yaml | \
+#"$BORG_BIN" create  -s --list --compression zstd --stdin-name "${archivename}.tar" "$archivename" -
 
