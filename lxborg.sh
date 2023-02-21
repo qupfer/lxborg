@@ -115,7 +115,7 @@ fi
 
 
 # make a snapsghot
-#lxc snapshot "$machinename"  "$snapshotname" --reuse
+lxc snapshot "$machinename"  "$snapshotname" --reuse
 
 
 # container of vm?
