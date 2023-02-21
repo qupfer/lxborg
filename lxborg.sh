@@ -11,13 +11,13 @@ archivename=""   # if its empty, the archivename is name_date (myContainer_2023-
 ssh_user=root
 ssh_host=myhost.domain.com
 ssh_port=22
-ssh_key="" # not implemented yet
+#ssh_key="" # not implemented yet
 
 ### BORG CONFIG ###
-borg_repo="ssh://${ssh_user}"@"${ssh_host}":"${ssh_port}/data/test_repo"
+borg_repo="ssh://${ssh_user}@${ssh_host}:{ssh_port}/data/test_repo"
 borg_bin="./borg2b4"
 borg_passphrase="abcde"
-borg_remote_path='~/borg_portable'
+borg_remote_path="\$HOME/borg_portable"
 
 ### LXC CONFIG ###
 lxd_path="/var/snap/lxd/common/lxd"
@@ -30,7 +30,7 @@ vm_snapshot_path="${lxd_path}/virtual-machines-snapshots"
 configfile=config.txt
 
 ### EXPORTS ###
-machinename=$machinename snapshotname=$snapshotname archivename=$archivename 
+# shellcheck source=config.txt
 [ -f $configfile ] && source $configfile
 export BORG_REMOTE_PATH="$borg_remote_path"
 export BORG_BIN="$borg_bin"
@@ -39,18 +39,15 @@ export BORG_PASSPHRASE="$borg_passphrase"
 
 ### commandline options from https://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash ###
 
-# More safety, by turning some bugs into errors.
-# Without `errexit` you don’t need ! and can replace
-# ${PIPESTATUS[0]} with a simple $?, but I prefer safety.
 set -o errexit -o pipefail -o noclobber -o nounset
 
-# -allow a command to fail with !’s side effect on errexit
-# -use return value from ${PIPESTATUS[0]}, because ! hosed $?
+# shellcheck disable=SC2251
 ! getopt --test > /dev/null 
 if [[ ${PIPESTATUS[0]} -ne 4 ]]; then
-    echo 'I’m sorry, `getopt --test` failed in this environment.'
+    echo "I'm sorry, $(getopt --test) failed in this environment."
     exit 1
 fi
+
 
 LONGOPTS=run:,machinename:,snapshotname:,archivename:,configfile:
 OPTIONS=r:m:s:a:c:
@@ -58,6 +55,8 @@ OPTIONS=r:m:s:a:c:
 # -temporarily store output to be able to check for errors
 # -activate quoting/enhanced mode (e.g. by writing out “--options”)
 # -pass arguments only via   -- "$@"   to separate them correctly
+
+# shellcheck disable=SC2251
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
     # e.g. return value is 1
@@ -71,7 +70,8 @@ eval set -- "$PARSED"
 while true; do
     case "$1" in
         -r|--run)
-            execute="$2"
+            #execute=( "$2" )
+            IFS=" " read -r -a execute <<< "$2"
             shift 2
             ;;
         -m|--machinename)
@@ -104,22 +104,22 @@ done
 
 
 if [ -n "${execute-}" ]; then
-"$BORG_BIN" $execute
+"$BORG_BIN" "${execute[@]}"
 exit 0
 fi
 
-date=$(date +%F_%T)
+
 [ -z "$archivename" ] && archivename="${machinename}_$(date +%F_%T)"
 
 
 
 
 # make a snapsghot
-lxc snapshot "$machinename"  "$snapshotname" --reuse
+#lxc snapshot "$machinename"  "$snapshotname" --reuse
 
 
 # container of vm?
-type=$(lxc info $machinename | grep -i '^Type:' | cut -d' ' -f2)
+type=$(lxc info "$machinename" | grep -i '^Type:' | cut -d' ' -f2)
 
 
 # prepare index.yaml
@@ -152,23 +152,21 @@ indexdir=$(mktemp -d)
 if [ "$type" == "container" ]; then
     prefix="$container_prefix"
     info=$(sudo sed 's/^/  /' "$container_snapshot_path/$machinename/$snapshotname/backup.yaml")
-    tar_command="sudo tar "${additonal_tar_args-}" --numeric-owner --xattrs --acls -c -O  -C "$container_snapshot_path/$machinename/"  --transform "s#^${snapshotname}#backup/container#" "$snapshotname" -C "$indexdir" --transform "s#^index.yaml#backup/index.yaml#"  index.yaml" 
+    tar_command="sudo tar ${additonal_tar_args-} --numeric-owner --xattrs --acls -c -O  -C "$container_snapshot_path/$machinename/"  --transform "s#^${snapshotname}#backup/container#" $snapshotname -C $indexdir --transform s#^index.yaml#backup/index.yaml#  index.yaml" 
 
 elif [ "$type" == "virtual-machine" ]; then
     prefix="$vm_prefix"
     info=$(sudo sed 's/^/  /' "$vm_snapshot_path/$machinename/$snapshotname/backup.yaml")
-    tar_command="sudo tar "${additonal_tar_args-}" --numeric-owner --xattrs --acls -c -O  -C "$vm_snapshot_path/$machinename/" --transform "s#^${snapshotname}#backup/virtual-machine#" --transform "s#^backup/virtual-machine/root.img#backup/virtual-machine.img#"  "$snapshotname" -C "$indexdir" --transform "s#^index.yaml#backup/index.yaml#" index.yaml"
+    tar_command="sudo tar ${additonal_tar_args-} --numeric-owner --xattrs --acls -c -O  -C "$vm_snapshot_path/$machinename/" --transform s#^${snapshotname}#backup/virtual-machine# --transform s#^backup/virtual-machine/root.img#backup/virtual-machine.img#  $snapshotname -C $indexdir --transform s#^index.yaml#backup/index.yaml# index.yaml"
 fi
 
-printf "${prefix}\n${info}" > "$indexdir"/index.yaml
-
-
+printf "%s\n%s" "$prefix" "$info"  > "$indexdir"/index.yaml
 
 
 # put borg to destination
 remote_sha=$(ssh -p $ssh_port $ssh_user@${ssh_host} "sha256sum $BORG_REMOTE_PATH" | cut -d" " -f1)
 local_sha=$(sha256sum "$BORG_BIN" | cut -d" " -f1)
-[[ $remote_sha == $local_sha ]] || scp -P $ssh_port "$BORG_BIN" "$ssh_user"@"${ssh_host}:$BORG_REMOTE_PATH"
+[[ $remote_sha == "$local_sha" ]] || scp -P "$ssh_port" "$BORG_BIN" "$ssh_user"@"${ssh_host}":"$BORG_REMOTE_PATH"
 
 
 # show current archives or create repo 
@@ -176,4 +174,5 @@ local_sha=$(sha256sum "$BORG_BIN" | cut -d" " -f1)
 
 
 #BORG IT
-"$BORG_BIN" create  -s --content-from-command --files-cache=disabled  --list --progress --compression zstd --stdin-name "${archivename}.tar" "$archivename" -- $tar_command
+IFS=" " read -r -a tar_execute <<< "$tar_command"
+"$BORG_BIN" create  -s --content-from-command --files-cache=disabled  --list --progress --compression zstd --stdin-name "${archivename}.tar" "$archivename" --  "${tar_execute[@]}"
