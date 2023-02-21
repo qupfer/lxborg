@@ -5,7 +5,7 @@
 machinename=myContainer
 snapshotname=borg
 archivename=""   # if its empty, the archivename is name_date (myContainer_2023-02-17_07:37:25)
-additonal_tar_args="-v"
+#additonal_tar_args="-v"
 
 ### SSH Config ###
 ssh_user=root
@@ -152,12 +152,12 @@ indexdir=$(mktemp -d)
 if [ "$type" == "container" ]; then
     prefix="$container_prefix"
     info=$(sudo sed 's/^/  /' "$container_snapshot_path/$machinename/$snapshotname/backup.yaml")
-    tar_command="sudo tar "$additonal_tar_args" --numeric-owner --xattrs --acls -c -O  -C "$container_snapshot_path/$machinename/"  --transform "s#$snapshotname#backup/container#" "$snapshotname" -C "$indexdir" --transform "s#^index.yaml#backup/index.yaml#"  index.yaml" 
+    tar_command="sudo tar "${additonal_tar_args-}" --numeric-owner --xattrs --acls -c -O  -C "$container_snapshot_path/$machinename/"  --transform "s#^${snapshotname}#backup/container#" "$snapshotname" -C "$indexdir" --transform "s#^index.yaml#backup/index.yaml#"  index.yaml" 
 
 elif [ "$type" == "virtual-machine" ]; then
     prefix="$vm_prefix"
     info=$(sudo sed 's/^/  /' "$vm_snapshot_path/$machinename/$snapshotname/backup.yaml")
-    tar_command="sudo tar "$additonal_tar_args" --numeric-owner --xattrs --acls -c -O  -C "$vm_snapshot_path/$machinename/" --transform "s#$snapshotname#backup/virtual-machine#" --transform "s#backup/virtual-machine/root.img#backup/virtual-machine.img#"  "$snapshotname" -C "$indexdir" --transform "s#^index.yaml#backup/index.yaml#" index.yaml"
+    tar_command="sudo tar "${additonal_tar_args-}" --numeric-owner --xattrs --acls -c -O  -C "$vm_snapshot_path/$machinename/" --transform "s#^${snapshotname}#backup/virtual-machine#" --transform "s#^backup/virtual-machine/root.img#backup/virtual-machine.img#"  "$snapshotname" -C "$indexdir" --transform "s#^index.yaml#backup/index.yaml#" index.yaml"
 fi
 
 printf "${prefix}\n${info}" > "$indexdir"/index.yaml
@@ -176,8 +176,4 @@ local_sha=$(sha256sum "$BORG_BIN" | cut -d" " -f1)
 
 
 #BORG IT
-"$BORG_BIN" create  -s --content-from-command --list --progress --compression zstd --stdin-name "${archivename}.tar" "$archivename" -- $tar_command
-
-#sudo tar "$additonal_tar_args" --numeric-owner --xattrs --acls -c -O  -C "$container_snapshot_path/$machinename/"  --transform "s/$snapshotname/backup\/container/" "$snapshotname" -C "$indexdir" --transform "s/^index.yaml/backup\/index.yaml/" index.yaml | \
-#"$BORG_BIN" create  -s --list --compression zstd --stdin-name "${archivename}.tar" "$archivename" -
-
+"$BORG_BIN" create  -s --content-from-command --files-cache=disabled  --list --progress --compression zstd --stdin-name "${archivename}.tar" "$archivename" -- $tar_command
