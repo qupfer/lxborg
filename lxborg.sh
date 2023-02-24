@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -x
 #### COPY TO CONFIGFILE ####
 ### Backup Config ###
 machinename=myContainer
@@ -107,36 +107,6 @@ done
 
 
 
-if [ -n "${execute-}" ]; then
-"$BORG_BIN" "${execute[@]}"
-exit 0
-fi
-
-
-if [ -n "${extract-}" ]; then
-#tempdir=$(mktemp -d -p .)
-tempdir=$(mktemp -d)
-pwd="$PWD"
-cd "$tempdir"
-"$BORG_BIN" extract "$extract"
-mv $snapshotname backup
-exit 0
-fi
-
-[ -z "$archivename" ] && archivename="${machinename}_$(date +%F_%T)"
-
-
-
-
-# make a snapsghot
-lxc snapshot "$machinename"  "$snapshotname" --reuse
-
-
-# container of vm?
-type=$(lxc info "$machinename" | grep -i '^Type:' | cut -d' ' -f2)
-
-
-# prepare index.yaml
 container_prefix=$(cat <<-EOF
 name: $machinename
 backend: btrfs
@@ -160,21 +130,70 @@ EOF
 )
 
 
+if [ -n "${execute-}" ]; then
+"$BORG_BIN" "${execute[@]}"
+exit 0
+fi
+
+
+if [ -n "${extract-}" ]; then
+    tempdir=$(mktemp -d -p .)
+    cd "$tempdir"
+    
+    # extract all
+    "$BORG_BIN" extract "$extract"
+
+
+    # prepare index.yaml
+    machinename=$(sed -n '/^container:$/,/^[a-z]*:/p'  "$snapshotname/backup.yaml" | grep -i "^  name: " | cut -d" " -f4)
+    info=$(sudo sed 's/^/  /' "$snapshotname/backup.yaml")
+    grep -q "type: container" $snapshotname/backup.yaml && { prefix=$container_prefix; mv "$snapshotname" container; }
+    grep -q "type: virtual-machine" $snapshotname/backup.yaml && { prefix=$vm_prefix; mv "$snapshotname" virtual-machine ; mv virtual-machine/root.img virtual-machine.img; }
+    printf "%s\n%s" "$prefix" "$info"  > "index.yaml"
+    sed -in "s/name:.*/name: $machinename/g" index.yaml
+
+
+    # tar it
+    cd ..
+    dirname=$(basename "$tempdir")
+    tar -c -f "$pwd/${extract}.tar"  --numeric-owner --xattrs --acls --transform "s#$dirname#backup#" "$dirname"
+    
+    # clean up
+    rm -rf $tempdir
+    exit 0
+fi
+
+[ -z "$archivename" ] && archivename="${machinename}_$(date +%F_%T)"
+
+
+
+
+# make a snapsghot
+lxc snapshot "$machinename"  "$snapshotname" --reuse
+
+
+# container of vm?
+type=$(lxc info "$machinename" | grep -i '^Type:' | cut -d' ' -f2)
+
+
+
+
+
 
 #prepare info
 indexdir=$(mktemp -d)
 if [ "$type" == "container" ]; then
     prefix="$container_prefix"
     info=$(sudo sed 's/^/  /' "$container_snapshot_path/$machinename/$snapshotname/backup.yaml")
+    snapshot_path="$container_snapshot_path"
     tar_command="sudo tar ${additonal_tar_args-} --numeric-owner --xattrs --acls -c -O  -C "$container_snapshot_path/$machinename/"  --transform "s#^${snapshotname}#backup/container#" $snapshotname -C $indexdir --transform s#^index.yaml#backup/index.yaml#  index.yaml" 
 
 elif [ "$type" == "virtual-machine" ]; then
     prefix="$vm_prefix"
     info=$(sudo sed 's/^/  /' "$vm_snapshot_path/$machinename/$snapshotname/backup.yaml")
+    snapshot_path="$vm_snapshot_path"
     tar_command="sudo tar ${additonal_tar_args-} --numeric-owner --spare --xattrs --acls -c -O  -C "$vm_snapshot_path/$machinename/" --transform s#^${snapshotname}#backup/virtual-machine# --transform s#^backup/virtual-machine/root.img#backup/virtual-machine.img#  $snapshotname -C $indexdir --transform s#^index.yaml#backup/index.yaml# index.yaml"
 fi
-
-printf "%s\n%s" "$prefix" "$info"  > "$indexdir"/index.yaml
 
 
 # put borg to destination
@@ -191,5 +210,5 @@ local_sha=$(sha256sum "$BORG_BIN" | cut -d" " -f1)
 #IFS=" " read -r -a tar_execute <<< "$tar_command"
 #"$BORG_BIN" create  -s --content-from-command --files-cache=disabled  --list --progress --compression zstd --stdin-name "${archivename}.tar" "$archivename" --  "${tar_execute[@]}"
 set -x
-cd "$container_snapshot_path/$machinename"
-"$BORG_BIN" create  -s  --list --progress --compression zstd "$archivename" .
+cd "$snapshot_path/$machinename"
+"$BORG_BIN" create  -s  --progress --comment "container" --compression zstd "$archivename" "$snapshotname"
