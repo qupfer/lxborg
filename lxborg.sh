@@ -1,5 +1,6 @@
 #!/bin/bash
-set -x
+
+
 #### COPY TO CONFIGFILE ####
 ### Backup Config ###
 machinename=myContainer
@@ -209,6 +210,5 @@ local_sha=$(sha256sum "$BORG_BIN" | cut -d" " -f1)
 #BORG IT
 #IFS=" " read -r -a tar_execute <<< "$tar_command"
 #"$BORG_BIN" create  -s --content-from-command --files-cache=disabled  --list --progress --compression zstd --stdin-name "${archivename}.tar" "$archivename" --  "${tar_execute[@]}"
-set -x
 cd "$snapshot_path/$machinename"
-"$BORG_BIN" create  -s  --progress --comment "container" --compression zstd "$archivename" "$snapshotname"
+"$BORG_BIN" create  -s  --progress --compression zstd "$archivename" "$snapshotname"
