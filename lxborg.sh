@@ -157,7 +157,7 @@ if [ "$type" == "container" ]; then
 elif [ "$type" == "virtual-machine" ]; then
     prefix="$vm_prefix"
     info=$(sudo sed 's/^/  /' "$vm_snapshot_path/$machinename/$snapshotname/backup.yaml")
-    tar_command="sudo tar ${additonal_tar_args-} --numeric-owner --spare --xattrs --acls -c -O  -C "$vm_snapshot_path/$machinename/" --transform s#^${snapshotname}#backup/virtual-machine# --transform s#^backup/virtual-machine/root.img#backup/virtual-machine.img#  $snapshotname -C $indexdir --transform s#^index.yaml#backup/index.yaml# index.yaml"
+    tar_command="sudo tar ${additonal_tar_args-} --numeric-owner --sparse --xattrs --acls -c -O  -C "$vm_snapshot_path/$machinename/" --transform s#^${snapshotname}#backup/virtual-machine# --transform s#^backup/virtual-machine/root.img#backup/virtual-machine.img#  $snapshotname -C $indexdir --transform s#^index.yaml#backup/index.yaml# index.yaml"
 fi
 
 printf "%s\n%s" "$prefix" "$info"  > "$indexdir"/index.yaml
