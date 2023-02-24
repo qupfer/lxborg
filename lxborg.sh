@@ -33,7 +33,7 @@ configfile=config.txt
 # shellcheck source=config.txt
 [ -f $configfile ] && source $configfile
 export BORG_REMOTE_PATH="$borg_remote_path"
-export BORG_BIN="$borg_bin"
+export BORG_BIN=$(realpath "$borg_bin")
 export BORG_REPO="$borg_repo"
 export BORG_PASSPHRASE="$borg_passphrase"
 
@@ -49,8 +49,8 @@ if [[ ${PIPESTATUS[0]} -ne 4 ]]; then
 fi
 
 
-LONGOPTS=run:,machinename:,snapshotname:,archivename:,configfile:
-OPTIONS=r:m:s:a:c:
+LONGOPTS=run:,machinename:,snapshotname:,archivename:,configfile:,extract:
+OPTIONS=r:m:s:a:c:x:
 # -regarding ! and PIPESTATUS see above
 # -temporarily store output to be able to check for errors
 # -activate quoting/enhanced mode (e.g. by writing out “--options”)
@@ -90,6 +90,10 @@ while true; do
             configfile="$2"
             shift 2
             ;;
+        -x|--extract)
+            extract="$2"
+            shift 2
+            ;;
         --)
             shift
             break
@@ -108,6 +112,16 @@ if [ -n "${execute-}" ]; then
 exit 0
 fi
 
+
+if [ -n "${extract-}" ]; then
+#tempdir=$(mktemp -d -p .)
+tempdir=$(mktemp -d)
+pwd="$PWD"
+cd "$tempdir"
+"$BORG_BIN" extract "$extract"
+mv $snapshotname backup
+exit 0
+fi
 
 [ -z "$archivename" ] && archivename="${machinename}_$(date +%F_%T)"
 
@@ -174,5 +188,8 @@ local_sha=$(sha256sum "$BORG_BIN" | cut -d" " -f1)
 
 
 #BORG IT
-IFS=" " read -r -a tar_execute <<< "$tar_command"
-"$BORG_BIN" create  -s --content-from-command --files-cache=disabled  --list --progress --compression zstd --stdin-name "${archivename}.tar" "$archivename" --  "${tar_execute[@]}"
+#IFS=" " read -r -a tar_execute <<< "$tar_command"
+#"$BORG_BIN" create  -s --content-from-command --files-cache=disabled  --list --progress --compression zstd --stdin-name "${archivename}.tar" "$archivename" --  "${tar_execute[@]}"
+set -x
+cd "$container_snapshot_path/$machinename"
+"$BORG_BIN" create  -s  --list --progress --compression zstd "$archivename" .
