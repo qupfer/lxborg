@@ -16,9 +16,9 @@ ssh_port=22
 
 ### BORG CONFIG ###
 borg_repo="ssh://${ssh_user}@${ssh_host}:${ssh_port}/data/test_repo"
-borg_bin="./borg2b4"
+borg_bin="./borg2b5"
 borg_passphrase="abcde"
-borg_remote_path="\$HOME/borg_portable"
+borg_remote_path="\$HOME/borg_$HOSTNAME"
 
 ### LXC CONFIG ###
 lxd_path="/var/snap/lxd/common/lxd"
