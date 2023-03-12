@@ -198,7 +198,7 @@ fi
 
 
 # put borg to destination
-remote_sha=$(ssh -p $ssh_port $ssh_user@${ssh_host} "sha256sum $BORG_REMOTE_PATH" | cut -d" " -f1)
+remote_sha=$(ssh -p $ssh_port $ssh_user@${ssh_host} "sha256sum $BORG_REMOTE_PATH" | cut -d" " -f1 || echo "")
 local_sha=$(sha256sum "$BORG_BIN" | cut -d" " -f1)
 [[ $remote_sha == "$local_sha" ]] || scp -P "$ssh_port" "$BORG_BIN" "$ssh_user"@"${ssh_host}":"$BORG_REMOTE_PATH"
 
