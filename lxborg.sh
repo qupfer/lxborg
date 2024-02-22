@@ -2,7 +2,7 @@
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 SCRIPT=$(realpath  "${BASH_SOURCE[0]}")
-
+CUR_DIR=$PWD
 cd "$SCRIPT_DIR"
 
 
@@ -43,17 +43,16 @@ main(){
 }
 
 check_sudo(){
-    set -x
     uid=$(id -u)
     gid=$(id -g)
+
 if [[ ${UID} -gt 0 ]] ; then
     uid=${cmd_uid:-$uid}
     gid=${cmd_gid:-$gid}
     sudo "$SCRIPT" "$@" --internal_uid "$uid" --internal_gid "$gid"
     exit 0
 fi
-internal_uid=${cmd_uid:-$uid}
-internal_gid=${cmd_gid:-$gid}
+
 
 }
 
@@ -276,6 +275,7 @@ create_importable_tar_from_borg(){
     
     # extract all
     "$BORG_BIN_REAL" extract "$extract"
+    filepath="$CUR_DIR"/"$extract".tar
     
 
     #chmod -R u+rw *
@@ -296,13 +296,14 @@ create_importable_tar_from_borg(){
     cd ..
     dirname=$(basename "$tempdir")
     read -r -a additonal_tar_args_array <<< "$additonal_tar_args"
-    tar "${additonal_tar_args_array[@]}" -c -f "$PWD/${extract}.tar"  --numeric-owner --xattrs --acls --transform "s#$dirname#backup#" "$dirname"
-    chown "$internal_uid":"$internal_gid" "$PWD/${extract}.tar"
+    tar "${additonal_tar_args_array[@]}" -c -f "$filepath"  --numeric-owner --xattrs --acls --transform "s#$dirname#backup#" "$dirname"
+    chown "${internal_uid:-0}":"${internal_gid:-0}" "$filepath"
+    suffix=$(file -b --extension "$filepath")
+    mv "$filepath" "${filepath}.${suffix}"
     # clean up
     rm -rf "$tempdir"
     exit 0
 }
-
 
 
 readmemd() {
