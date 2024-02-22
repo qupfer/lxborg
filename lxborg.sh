@@ -1,7 +1,11 @@
 #!/bin/bash
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+SCRIPT=$(realpath  "${BASH_SOURCE[0]}")
+
 cd "$SCRIPT_DIR"
+
+
 
 main(){
     parse_command_line "$@"
@@ -39,12 +43,13 @@ main(){
 }
 
 check_sudo(){
+    set -x
     uid=$(id -u)
     gid=$(id -g)
 if [[ ${UID} -gt 0 ]] ; then
     uid=${cmd_uid:-$uid}
     gid=${cmd_gid:-$gid}
-    sudo "${BASH_SOURCE[0]}" "$@" --internal_uid "$uid" --internal_gid "$gid"
+    sudo "$SCRIPT" "$@" --internal_uid "$uid" --internal_gid "$gid"
     exit 0
 fi
 internal_uid=${cmd_uid:-$uid}
